@@ -1,0 +1,27 @@
+{
+  "name": "LibreTrep - Sistema de Conteo Electoral",
+  "short_name": "LibreTrep",
+  "description": "Sistema de Conteo Rápido Electoral - Partido Libre Honduras 2025",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["government", "utilities"],
+  "lang": "es-HN",
+  "dir": "ltr"
+}

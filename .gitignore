@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# development scripts
+*.ps1
+
+# local uploads (images should be in cloud storage in production)
+/public/uploads/

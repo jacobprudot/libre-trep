@@ -1,0 +1,338 @@
+// Prisma schema for LibreTrep Electoral System
+// Database: PostgreSQL 16 with PostGIS extension
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTHENTICATION & USERS
+// ============================================
+
+model Delegate {
+  id        String   @id @default(cuid())
+  dni       String   @unique // Cédula (13 dígitos sin guiones)
+  qrCode    String   @unique // QR Code del delegado
+  fullName  String
+  phone     String   @unique // Teléfono (8 dígitos)
+
+  // GPS Location (PostGIS Point)
+  latitude  Float
+  longitude Float
+
+  // Device info for audit
+  deviceInfo Json?
+
+  // Voting center assignment
+  centerId  String?
+  center    VotingCenter? @relation(fields: [centerId], references: [id])
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  actas     Acta[]
+  auditLogs AuditLog[]
+
+  @@index([dni])
+  @@index([qrCode])
+  @@index([phone])
+  @@map("delegates")
+}
+
+model User {
+  id       String   @id @default(cuid())
+  email    String   @unique
+  password String   // Hashed
+  role     UserRole @default(DELEGADO)
+
+  name     String
+  active   Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+enum UserRole {
+  DELEGADO
+  COORDINADOR_DEPARTAMENTAL
+  COORDINADOR_NACIONAL
+  ANALISTA
+  ADMIN
+}
+
+// ============================================
+// VOTING INFRASTRUCTURE
+// ============================================
+
+model VotingCenter {
+  id             String  @id @default(cuid())
+  code           String  @unique // Código oficial del CNE
+  name           String
+  address        String?
+
+  // Location
+  departmentId   String
+  department     Department @relation(fields: [departmentId], references: [id])
+  municipalityId String
+  municipality   Municipality @relation(fields: [municipalityId], references: [id])
+
+  // Additional location info (from Centros de Votacion.xlsx)
+  areaCode       Int?    // 1=URBANA, 2=RURAL
+  areaName       String? // URBANA, RURAL
+  sectorCode     Int?
+  sectorName     String? // BO. EL CHILE, etc.
+
+  // GPS coordinates (optional - can use municipality coords)
+  latitude       Float?
+  longitude      Float?
+
+  // Stats
+  registeredVoters Int    @default(0)
+  jrvCount         Int    @default(0) // Number of JRVs in this center
+
+  // Relations
+  delegates      Delegate[]
+  actas          Acta[]
+  jrvs           JRV[] // Juntas Receptoras de Votos
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([code])
+  @@index([departmentId])
+  @@index([municipalityId])
+  @@map("voting_centers")
+}
+
+model Department {
+  id             String @id @default(cuid())
+  code           String @unique
+  name           String
+
+  municipalities Municipality[]
+  votingCenters  VotingCenter[]
+  actas          Acta[]
+
+  @@map("departments")
+}
+
+model Municipality {
+  id             String @id @default(cuid())
+  code           String @unique
+  name           String
+
+  // GPS coordinates (from Ubicaciones.xlsx)
+  latitude       Float?
+  longitude      Float?
+
+  departmentId   String
+  department     Department @relation(fields: [departmentId], references: [id])
+
+  votingCenters  VotingCenter[]
+  actas          Acta[]
+
+  @@index([departmentId])
+  @@map("municipalities")
+}
+
+// JRV - Junta Receptora de Votos (voting table within a center)
+model JRV {
+  id             String @id @default(cuid())
+  code           String @unique // JRV number (e.g., "09174")
+
+  centerId       String
+  center         VotingCenter @relation(fields: [centerId], references: [id])
+
+  members        Int    @default(3) // Number of JRV members
+
+  actas          Acta[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([centerId])
+  @@map("jrvs")
+}
+
+// ============================================
+// ELECTORAL ACTAS
+// ============================================
+
+model Acta {
+  id            String     @id @default(cuid())
+  code          String     @unique // Código único del acta física
+  type          ActaType   // PRESIDENCIAL, DEPARTAMENTAL, MUNICIPAL
+
+  // Delegate who captured
+  delegateId    String
+  delegate      Delegate   @relation(fields: [delegateId], references: [id])
+
+  // Location
+  centerId      String
+  center        VotingCenter @relation(fields: [centerId], references: [id])
+  jrvId         String?
+  jrv           JRV?       @relation(fields: [jrvId], references: [id])
+  departmentId  String
+  department    Department @relation(fields: [departmentId], references: [id])
+  municipalityId String
+  municipality  Municipality @relation(fields: [municipalityId], references: [id])
+
+  // Image
+  imageUrl      String     // URL to stored image
+  imageHash     String     // SHA-256 hash for integrity
+
+  // Processing status
+  status        ActaStatus @default(PENDING)
+  ocrProcessed  Boolean    @default(false)
+  ocrConfidence Float?     // 0-100
+
+  // Manual digitization (for PRESIDENCIAL only)
+  manualVotes   Vote[]
+
+  // Voting totals (from acta)
+  totalVoters   Int?       // Total de votantes
+  validBallots  Int?       // Papeletas válidas
+  blankVotes    Int?       // Votos en blanco
+  nullVotes     Int?       // Votos nulos
+  biometricCount Int?      // Ciudadanos según biométrico
+  signaturesCount Int?     // Número de firmas
+
+  // OCR results
+  ocrResults    Json?      // Raw OCR data
+
+  // Verification
+  verified      Boolean    @default(false)
+  verifiedBy    String?    // User ID who verified
+  verifiedAt    DateTime?
+
+  // Notes
+  observations  String?
+
+  // Metadata
+  capturedAt    DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([delegateId])
+  @@index([centerId])
+  @@index([jrvId])
+  @@index([type])
+  @@index([status])
+  @@index([code])
+  @@map("actas")
+}
+
+enum ActaType {
+  PRESIDENTIAL  // Acta Presidencial
+  DEPUTIES      // Acta de Diputados (Departamental)
+  MAYORS        // Acta de Alcaldes (Municipal)
+}
+
+enum ActaStatus {
+  PENDING           // Just uploaded
+  OCR_PROCESSING    // OCR in progress
+  OCR_COMPLETE      // OCR done
+  REQUIRES_REVIEW   // OCR vs Manual mismatch
+  VERIFIED          // Coordinator verified
+  REJECTED          // Invalid acta
+}
+
+// ============================================
+// VOTES
+// ============================================
+
+model Vote {
+  id        String   @id @default(cuid())
+
+  actaId    String
+  acta      Acta     @relation(fields: [actaId], references: [id], onDelete: Cascade)
+
+  partyId   String
+  party     Party    @relation(fields: [partyId], references: [id])
+
+  votes     Int      // Number of votes
+  source    VoteSource // MANUAL or OCR
+
+  createdAt DateTime @default(now())
+
+  @@unique([actaId, partyId, source]) // One entry per party per source
+  @@index([actaId])
+  @@index([partyId])
+  @@map("votes")
+}
+
+enum VoteSource {
+  MANUAL  // Typed by delegate
+  OCR     // Extracted by OCR
+}
+
+model Party {
+  id        String  @id @default(cuid())
+  code      String  @unique // DC, PINU, LIBRE, PL, PN
+  name      String
+  color     String? // Hex color for UI
+  logo      String? // Logo URL
+  order     Int     @default(0) // Display order
+
+  votes     Vote[]
+
+  @@map("parties")
+}
+
+// ============================================
+// AUDIT & LOGS
+// ============================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+
+  action      String   // CREATE, UPDATE, DELETE, LOGIN, etc
+  entity      String   // acta, delegate, user, etc
+  entityId    String
+
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+
+  delegateId  String?
+  delegate    Delegate? @relation(fields: [delegateId], references: [id])
+
+  changes     Json?    // Before/after data
+  ipAddress   String?
+  userAgent   String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([delegateId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================
+// SYSTEM CONFIGURATION
+// ============================================
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+
+  updatedBy String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}

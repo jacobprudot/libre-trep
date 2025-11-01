@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LibreTrep - Sistema de Conteo Rápido Electoral
 
-## Getting Started
+**Progressive Web App para Conteo Rápido Electoral**
+Partido Libre - Honduras 2025
 
-First, run the development server:
+## 🎯 Descripción
+
+LibreTrep es un sistema PWA diseñado para procesar 6,300 actas electorales presidenciales en una ventana de 4 horas (18:00-22:00) el día de las elecciones generales, proporcionando resultados preliminares en tiempo real.
+
+## 🚀 Stack Tecnológico
+
+- **Frontend**: Next.js 14 (App Router) + TypeScript
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Database**: PostgreSQL 16 con PostGIS
+- **ORM**: Prisma
+- **Authentication**: DNI + QR + GPS + Phone
+- **PWA**: next-pwa
+- **OCR**: Tesseract.js + Google Cloud Vision
+- **Forms**: React Hook Form + Zod
+
+## 📋 Requisitos
+
+- Node.js 20+
+- PostgreSQL 16+
+- npm 11+
+
+## 🛠️ Instalación
+
+### 1. Instalar dependencias
+
+```bash
+npm install
+```
+
+### 2. Configurar variables de entorno
+
+```bash
+cp .env.example .env
+```
+
+Editar `.env` con tus credenciales.
+
+### 3. Configurar base de datos
+
+```bash
+# Crear base de datos
+createdb libretrep
+
+# Ejecutar migraciones
+npx prisma migrate dev --name init
+
+# Generar Prisma Client
+npx prisma generate
+```
+
+### 4. Iniciar desarrollo
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abrir [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Estructura del Proyecto
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+libre-trep/
+├── src/
+│   ├── app/                    # Next.js App Router
+│   ├── components/             # React components
+│   ├── lib/                    # Utilities
+│   ├── hooks/                  # Custom hooks
+│   └── types/                  # TypeScript types
+├── prisma/
+│   └── schema.prisma           # Database schema
+└── public/                     # Static assets
+```
 
-## Learn More
+## 🔑 Autenticación
 
-To learn more about Next.js, take a look at the following resources:
+- DNI (cédula) + QR Code
+- GPS validation
+- Phone verification
+- JWT tokens
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📱 Flujo de Conteo
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Login con DNI + QR + GPS
+2. Capturar foto acta presidencial
+3. Digitar votos (5 partidos)
+4. OCR automático
+5. Dashboard en tiempo real
 
-## Deploy on Vercel
+## 🚀 Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run dev          # Desarrollo
+npm run build        # Build producción
+npm run start        # Producción
+npx prisma studio    # DB GUI
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 👥 Equipo
+
+Proyecto del Partido Libre Honduras
+
+---
+
+**Estado**: 🚧 En desarrollo
+**Fecha límite**: Nov 30, 2025
