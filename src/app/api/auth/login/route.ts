@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateDistance } from '@/lib/utils';
 import { prisma } from '@/lib/prisma';
+import { processQR, getQRInfo } from '@/lib/qr-crypto';
 
 // Radio máximo permitido: 50km
 const MAX_DISTANCE_KM = 50;
@@ -19,6 +20,26 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // =====================================
+    // 1.5. PROCESAR Y VALIDAR QR CNE
+    // =====================================
+    const qrData = processQR(qrCode);
+    if (!qrData) {
+      return NextResponse.json(
+        { error: 'Código QR inválido o no se pudo descifrar. Verifica tu credencial.' },
+        { status: 400 }
+      );
+    }
+
+    // Obtener información legible del QR
+    const qrInfo = getQRInfo(qrData);
+    console.log('📱 QR Procesado:', {
+      partido: qrInfo.partido.nombre,
+      jrv: qrInfo.jrv.numeroFormateado,
+      cargo: qrInfo.cargo.nombre,
+      tipo: qrInfo.cargo.tipo,
+    });
 
     // Limpiar DNI (remover guiones)
     const cleanDNI = dni.replace(/\D/g, '');
@@ -42,10 +63,11 @@ export async function POST(request: NextRequest) {
     // 2. BUSCAR DELEGADO EN BASE DE DATOS
     // =====================================
     // IMPORTANTE: Todos los datos deben coincidir exactamente
+    // Buscamos por QR cifrado, DNI y teléfono
     const delegate = await prisma.delegate.findFirst({
       where: {
         AND: [
-          { qrCode },
+          { qrCodeEncrypted: qrCode },
           { dni: cleanDNI },
           { phone: cleanPhone },
         ],
@@ -205,6 +227,15 @@ export async function POST(request: NextRequest) {
         fullName: delegate.fullName,
         dni: delegate.dni,
         phone: delegate.phone,
+        // Información CNE del QR
+        partido: qrInfo.partido.nombre,
+        partidoSigla: qrInfo.partido.sigla,
+        jrv: qrInfo.jrv.numeroFormateado,
+        cargo: qrInfo.cargo.nombre,
+        cargoTipo: qrInfo.cargo.tipo,
+        puedeVotar: qrInfo.cargo.puedeVotar,
+        restriccionHoraria: qrInfo.cargo.restriccionHoraria,
+        // Centro de votación
         center: delegate.center ? {
           id: delegate.center.id,
           name: delegate.center.name,

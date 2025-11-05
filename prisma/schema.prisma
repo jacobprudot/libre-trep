@@ -17,9 +17,23 @@ datasource db {
 model Delegate {
   id        String   @id @default(cuid())
   dni       String   @unique // Cédula (13 dígitos sin guiones)
-  qrCode    String   @unique // QR Code del delegado
   fullName  String
   phone     String   @unique // Teléfono (8 dígitos)
+
+  // QR Code Information (CNE Official Format)
+  qrCodeEncrypted String   @unique // QR cifrado en Base64 (de la credencial)
+  qrCodeDecrypted String?           // QR descifrado (12 dígitos) - para auditoría
+
+  // Datos extraídos del QR (según especificación CNE)
+  partyCode       String?  // 01-05 (DC, LIBRE, PINU, PLH, PNH)
+  jrvNumber       String?  // 00001-99999
+  docType         String?  // 17=Miembro JRV, 18=CIE
+  cargoCode       String?  // 01-17 (Presidente, Secretario, etc.)
+
+  // Metadata del cargo
+  cargoName       String?  // "Presidente Propietario", etc.
+  cargoType       String?  // "MIEMBRO DE JRV" o "CIE"
+  canVote         Boolean  @default(true)
 
   // GPS Location (PostGIS Point)
   latitude  Float
@@ -41,8 +55,12 @@ model Delegate {
   auditLogs AuditLog[]
 
   @@index([dni])
-  @@index([qrCode])
+  @@index([qrCodeEncrypted])
+  @@index([qrCodeDecrypted])
   @@index([phone])
+  @@index([partyCode])
+  @@index([jrvNumber])
+  @@index([cargoCode])
   @@map("delegates")
 }
 
@@ -281,8 +299,10 @@ enum VoteSource {
 
 model Party {
   id        String  @id @default(cuid())
-  code      String  @unique // DC, PINU, LIBRE, PL, PN
+  code      String  @unique // 01-05 (DC, LIBRE, PINU, PLH, PNH)
+  cneCode   String  @unique // Código CNE oficial (01-05)
   name      String
+  shortName String  // DC, LIBRE, PINU, PLH, PNH
   color     String? // Hex color for UI
   logo      String? // Logo URL
   order     Int     @default(0) // Display order
@@ -290,6 +310,22 @@ model Party {
   votes     Vote[]
 
   @@map("parties")
+}
+
+// Cargos JRV - CNE Official Positions
+model CargoJRV {
+  id               String  @id @default(cuid())
+  code             String  @unique // 01-17
+  name             String  // "Presidente Propietario", etc.
+  type             String  // "MIEMBRO DE JRV" or "CIE"
+  canVote          Boolean @default(true)
+  timeRestriction  String  @default("1:00PM") // Hora límite para votar
+  order            Int     @default(0) // Display order
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("cargos_jrv")
 }
 
 // ============================================

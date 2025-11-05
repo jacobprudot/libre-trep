@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { generateMockQR, CARGOS_JRV, PARTIDOS } from '../src/lib/qr-crypto'
 
 const prisma = new PrismaClient()
 
@@ -9,11 +10,11 @@ async function main() {
   console.log('📊 Creando partidos políticos...')
 
   const parties = [
-    { code: 'LIBRE', name: 'Partido Libertad y Refundación', color: '#DC2626', order: 1 },
-    { code: 'PN', name: 'Partido Nacional', color: '#1E40AF', order: 2 },
-    { code: 'PL', name: 'Partido Liberal', color: '#EF4444', order: 3 },
-    { code: 'PINU', name: 'Partido Innovación y Unidad', color: '#16A34A', order: 4 },
-    { code: 'DC', name: 'Democracia Cristiana', color: '#F59E0B', order: 5 },
+    { code: 'LIBRE', cneCode: '02', shortName: 'LIBRE', name: 'Partido Libertad y Refundación', color: '#DC2626', order: 1 },
+    { code: 'PNH', cneCode: '05', shortName: 'PNH', name: 'Partido Nacional de Honduras', color: '#1E40AF', order: 2 },
+    { code: 'PLH', cneCode: '04', shortName: 'PLH', name: 'Partido Liberal de Honduras', color: '#EF4444', order: 3 },
+    { code: 'PINU', cneCode: '03', shortName: 'PINU', name: 'Partido Innovación y Unidad Social Demócrata', color: '#16A34A', order: 4 },
+    { code: 'DC', cneCode: '01', shortName: 'DC', name: 'Partido Demócrata Cristiano', color: '#F59E0B', order: 5 },
   ]
 
   for (const party of parties) {
@@ -58,31 +59,53 @@ async function main() {
   }
   console.log(`✅ ${departments.length} departamentos creados`)
 
-  // 3. Crear 20 delegados de prueba
+  // 3. Crear catálogo de Cargos JRV (CNE oficial)
+  console.log('📋 Creando catálogo de cargos JRV...')
+
+  const cargosData = Object.entries(CARGOS_JRV).map(([code, cargo], index) => ({
+    code,
+    name: cargo.name,
+    type: cargo.type,
+    canVote: cargo.canVote,
+    timeRestriction: cargo.timeRestriction,
+    order: index + 1,
+  }))
+
+  for (const cargo of cargosData) {
+    await prisma.cargoJRV.upsert({
+      where: { code: cargo.code },
+      update: {},
+      create: cargo,
+    })
+  }
+  console.log(`✅ ${cargosData.length} cargos JRV creados`)
+
+  // 4. Crear 20 delegados de prueba
   console.log('👥 Creando delegados de prueba...')
 
+  // Delegados de prueba con formato CNE
   const testDelegates = [
-    { dni: '0801199001234', fullName: 'Juan Carlos Pérez López', phone: '98765432', qrCode: 'QR-TEST-001', validGPS: true },
-    { dni: '0801199001235', fullName: 'María Fernanda García Ruiz', phone: '98765433', qrCode: 'QR-TEST-002', validGPS: true },
-    { dni: '0801199001236', fullName: 'Carlos Alberto Martínez Cruz', phone: '98765434', qrCode: 'QR-TEST-003', validGPS: true },
-    { dni: '0801199001237', fullName: 'Ana Isabel Rodríguez Flores', phone: '98765435', qrCode: 'QR-TEST-004', validGPS: true },
-    { dni: '0801199001238', fullName: 'Roberto José Hernández Soto', phone: '98765436', qrCode: 'QR-TEST-005', validGPS: true },
-    { dni: '0801199001239', fullName: 'Laura Patricia Gómez Díaz', phone: '98765437', qrCode: 'QR-TEST-006', validGPS: true },
-    { dni: '0801199001240', fullName: 'Diego Alejandro López Vargas', phone: '98765438', qrCode: 'QR-TEST-007', validGPS: true },
-    { dni: '0801199001241', fullName: 'Sofía Valentina Ramírez Castro', phone: '98765439', qrCode: 'QR-TEST-008', validGPS: true },
-    { dni: '0801199001242', fullName: 'Fernando Miguel Torres Ortiz', phone: '98765440', qrCode: 'QR-TEST-009', validGPS: true },
-    { dni: '0801199001243', fullName: 'Gabriela Andrea Morales Pérez', phone: '98765441', qrCode: 'QR-TEST-010', validGPS: true },
-    { dni: '0801199001244', fullName: 'Luis Eduardo Flores Gutiérrez', phone: '98765442', qrCode: 'QR-TEST-011', validGPS: true },
-    { dni: '0801199001245', fullName: 'Carolina Beatriz Sánchez Romero', phone: '98765443', qrCode: 'QR-TEST-012', validGPS: true },
-    { dni: '0801199001246', fullName: 'Javier Antonio Castillo Mejía', phone: '98765444', qrCode: 'QR-TEST-013', validGPS: true },
-    { dni: '0801199001247', fullName: 'Daniela Nicole Rivera Silva', phone: '98765445', qrCode: 'QR-TEST-014', validGPS: true },
-    { dni: '0801199001248', fullName: 'Andrés Felipe Mendoza Luna', phone: '98765446', qrCode: 'QR-TEST-015', validGPS: true },
-    { dni: '0801199001249', fullName: 'Valeria Alejandra Herrera Ramos', phone: '98765447', qrCode: 'QR-TEST-016', validGPS: true },
-    { dni: '0801199001250', fullName: 'Ricardo Enrique Núñez Vega', phone: '98765448', qrCode: 'QR-TEST-017', validGPS: true },
-    { dni: '0801199001251', fullName: 'Natalia Fernanda Aguilar Campos', phone: '98765449', qrCode: 'QR-TEST-018', validGPS: true },
+    { dni: '0801199001234', fullName: 'Juan Carlos Pérez López', phone: '98765432', partyCode: '02', jrvNumber: '00001', docType: '17', cargoCode: '01', validGPS: true },
+    { dni: '0801199001235', fullName: 'María Fernanda García Ruiz', phone: '98765433', partyCode: '02', jrvNumber: '00001', docType: '17', cargoCode: '03', validGPS: true },
+    { dni: '0801199001236', fullName: 'Carlos Alberto Martínez Cruz', phone: '98765434', partyCode: '02', jrvNumber: '00002', docType: '17', cargoCode: '01', validGPS: true },
+    { dni: '0801199001237', fullName: 'Ana Isabel Rodríguez Flores', phone: '98765435', partyCode: '02', jrvNumber: '00002', docType: '17', cargoCode: '03', validGPS: true },
+    { dni: '0801199001238', fullName: 'Roberto José Hernández Soto', phone: '98765436', partyCode: '02', jrvNumber: '00003', docType: '17', cargoCode: '01', validGPS: true },
+    { dni: '0801199001239', fullName: 'Laura Patricia Gómez Díaz', phone: '98765437', partyCode: '02', jrvNumber: '00003', docType: '17', cargoCode: '03', validGPS: true },
+    { dni: '0801199001240', fullName: 'Diego Alejandro López Vargas', phone: '98765438', partyCode: '02', jrvNumber: '00004', docType: '17', cargoCode: '05', validGPS: true },
+    { dni: '0801199001241', fullName: 'Sofía Valentina Ramírez Castro', phone: '98765439', partyCode: '02', jrvNumber: '00004', docType: '17', cargoCode: '07', validGPS: true },
+    { dni: '0801199001242', fullName: 'Fernando Miguel Torres Ortiz', phone: '98765440', partyCode: '05', jrvNumber: '00005', docType: '17', cargoCode: '01', validGPS: true },
+    { dni: '0801199001243', fullName: 'Gabriela Andrea Morales Pérez', phone: '98765441', partyCode: '05', jrvNumber: '00005', docType: '17', cargoCode: '03', validGPS: true },
+    { dni: '0801199001244', fullName: 'Luis Eduardo Flores Gutiérrez', phone: '98765442', partyCode: '04', jrvNumber: '00006', docType: '17', cargoCode: '01', validGPS: true },
+    { dni: '0801199001245', fullName: 'Carolina Beatriz Sánchez Romero', phone: '98765443', partyCode: '04', jrvNumber: '00006', docType: '17', cargoCode: '03', validGPS: true },
+    { dni: '0801199001246', fullName: 'Javier Antonio Castillo Mejía', phone: '98765444', partyCode: '03', jrvNumber: '00007', docType: '17', cargoCode: '01', validGPS: true },
+    { dni: '0801199001247', fullName: 'Daniela Nicole Rivera Silva', phone: '98765445', partyCode: '03', jrvNumber: '00007', docType: '17', cargoCode: '03', validGPS: true },
+    { dni: '0801199001248', fullName: 'Andrés Felipe Mendoza Luna', phone: '98765446', partyCode: '01', jrvNumber: '00008', docType: '17', cargoCode: '01', validGPS: true },
+    { dni: '0801199001249', fullName: 'Valeria Alejandra Herrera Ramos', phone: '98765447', partyCode: '01', jrvNumber: '00008', docType: '17', cargoCode: '03', validGPS: true },
+    { dni: '0801199001250', fullName: 'Ricardo Enrique Núñez Vega', phone: '98765448', partyCode: '02', jrvNumber: '00009', docType: '18', cargoCode: '15', validGPS: true },
+    { dni: '0801199001251', fullName: 'Natalia Fernanda Aguilar Campos', phone: '98765449', partyCode: '02', jrvNumber: '00009', docType: '18', cargoCode: '16', validGPS: true },
     // 🚫 2 delegados con GPS INVÁLIDO (>50km de Tegucigalpa)
-    { dni: '0801199001252', fullName: 'Sebastián David Medina Rojas - GPS LEJANO', phone: '98765450', qrCode: 'QR-TEST-019', validGPS: false },
-    { dni: '0801199001253', fullName: 'Isabella María Jiménez Santos - GPS LEJANO', phone: '98765451', qrCode: 'QR-TEST-020', validGPS: false },
+    { dni: '0801199001252', fullName: 'Sebastián David Medina Rojas - GPS LEJANO', phone: '98765450', partyCode: '02', jrvNumber: '00010', docType: '17', cargoCode: '01', validGPS: false },
+    { dni: '0801199001253', fullName: 'Isabella María Jiménez Santos - GPS LEJANO', phone: '98765451', partyCode: '05', jrvNumber: '00010', docType: '17', cargoCode: '03', validGPS: false },
   ]
 
   // Coordenadas de prueba (Tegucigalpa como base)
@@ -105,6 +128,17 @@ async function main() {
       longitude = -88.0333
     }
 
+    // Generar QR cifrado con formato CNE
+    const qrCodeEncrypted = generateMockQR({
+      partyCode: delegate.partyCode,
+      jrvNumber: delegate.jrvNumber,
+      docType: delegate.docType,
+      cargoCode: delegate.cargoCode,
+    })
+
+    // Obtener información del cargo
+    const cargo = CARGOS_JRV[delegate.cargoCode as keyof typeof CARGOS_JRV]
+
     await prisma.delegate.upsert({
       where: { dni: delegate.dni },
       update: {},
@@ -112,7 +146,15 @@ async function main() {
         dni: delegate.dni,
         fullName: delegate.fullName,
         phone: delegate.phone,
-        qrCode: delegate.qrCode,
+        qrCodeEncrypted,
+        qrCodeDecrypted: `${delegate.partyCode}${delegate.jrvNumber}${delegate.docType}1${delegate.cargoCode}`,
+        partyCode: delegate.partyCode,
+        jrvNumber: delegate.jrvNumber,
+        docType: delegate.docType,
+        cargoCode: delegate.cargoCode,
+        cargoName: cargo.name,
+        cargoType: cargo.type,
+        canVote: cargo.canVote,
         latitude,
         longitude,
         deviceInfo: { browser: 'Test', os: 'Test', validGPS: delegate.validGPS },
