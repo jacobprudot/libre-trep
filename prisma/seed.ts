@@ -209,17 +209,24 @@ async function main() {
     }
     console.log(`✅ ${votingCenters.length} centros de votación creados`)
 
-    // 4.5. Crear JRVs para cada centro
-    console.log('🗳️  Creando JRVs de prueba...')
+    // 4.5. Crear JRVs con códigos CNE (formato: 00001-99999)
+    console.log('🗳️  Creando JRVs de prueba con códigos CNE...')
 
-    // Crear 3 JRVs para CV-001 (para testing)
     const centerCV001 = await prisma.votingCenter.findUnique({ where: { code: 'CV-001' } })
 
     if (centerCV001) {
+      // JRVs con códigos CNE que coinciden con los QRs de los delegados
       const jrvs = [
-        { code: 'JRV-CV001-001', members: 5 },
-        { code: 'JRV-CV001-002', members: 5 },
-        { code: 'JRV-CV001-003', members: 5 },
+        { code: '00001', members: 5, description: 'JRV 1 - Escuela República de México' },
+        { code: '00002', members: 5, description: 'JRV 2 - Escuela República de México' },
+        { code: '00003', members: 5, description: 'JRV 3 - Escuela República de México' },
+        { code: '00004', members: 5, description: 'JRV 4 - Escuela República de México' },
+        { code: '00005', members: 5, description: 'JRV 5 - Escuela República de México' },
+        { code: '00006', members: 5, description: 'JRV 6 - Escuela República de México' },
+        { code: '00007', members: 5, description: 'JRV 7 - Escuela República de México' },
+        { code: '00008', members: 5, description: 'JRV 8 - Escuela República de México' },
+        { code: '00009', members: 5, description: 'JRV 9 - Escuela República de México' },
+        { code: '00010', members: 5, description: 'JRV 10 - Escuela República de México' },
       ]
 
       for (const jrv of jrvs) {
@@ -240,7 +247,7 @@ async function main() {
         data: { jrvCount: jrvs.length },
       })
 
-      console.log(`✅ ${jrvs.length} JRVs creadas para CV-001`)
+      console.log(`✅ ${jrvs.length} JRVs creadas con códigos CNE (00001-00010)`)
     }
 
     // 5. Asignar centros a los delegados de prueba

@@ -3,8 +3,8 @@ import { calculateDistance } from '@/lib/utils';
 import { prisma } from '@/lib/prisma';
 import { processQR, getQRInfo } from '@/lib/qr-crypto';
 
-// Radio máximo permitido: 50km
-const MAX_DISTANCE_KM = 50;
+// Radio máximo permitido desde el centro de votación de la JRV: 20km
+const MAX_DISTANCE_KM = 20;
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,35 +89,49 @@ export async function POST(request: NextRequest) {
     }
 
     // =====================================
-    // 4. VALIDAR GPS - UBICACIÓN
+    // 4. VALIDAR GPS - UBICACIÓN (Basado en JRV del QR)
     // =====================================
-    // Determinar coordenadas de referencia (centro o municipio)
+    // IMPORTANTE: El QR contiene el número de JRV, usamos ese para encontrar
+    // el centro de votación correcto y validar GPS (20km de radio)
+
+    // Buscar la JRV del QR en la base de datos
+    const jrv = await prisma.jRV.findFirst({
+      where: { code: qrData.jrvNumber },
+      include: {
+        center: {
+          include: {
+            municipality: true,
+          },
+        },
+      },
+    });
+
+    if (!jrv) {
+      return NextResponse.json(
+        { error: `JRV ${qrInfo.jrv.numeroFormateado} no encontrada en el sistema. Contacta al coordinador.` },
+        { status: 404 }
+      );
+    }
+
+    // Determinar coordenadas de referencia del centro de la JRV
     let referenceLatitude: number;
     let referenceLongitude: number;
     let referenceName: string;
 
-    if (delegate.center) {
+    if (jrv.center.latitude && jrv.center.longitude) {
       // Usar coordenadas del centro de votación
-      if (delegate.center.latitude && delegate.center.longitude) {
-        referenceLatitude = delegate.center.latitude;
-        referenceLongitude = delegate.center.longitude;
-        referenceName = delegate.center.name;
-      } else if (delegate.center.municipality?.latitude && delegate.center.municipality?.longitude) {
-        // Fallback: usar coordenadas del municipio
-        referenceLatitude = delegate.center.municipality.latitude;
-        referenceLongitude = delegate.center.municipality.longitude;
-        referenceName = delegate.center.municipality.name;
-      } else {
-        return NextResponse.json(
-          { error: 'No hay coordenadas de referencia configuradas para tu centro.' },
-          { status: 500 }
-        );
-      }
+      referenceLatitude = jrv.center.latitude;
+      referenceLongitude = jrv.center.longitude;
+      referenceName = jrv.center.name;
+    } else if (jrv.center.municipality?.latitude && jrv.center.municipality?.longitude) {
+      // Fallback: usar coordenadas del municipio
+      referenceLatitude = jrv.center.municipality.latitude;
+      referenceLongitude = jrv.center.municipality.longitude;
+      referenceName = jrv.center.municipality.name;
     } else {
-      // Sin centro asignado - no podemos validar ubicación
       return NextResponse.json(
-        { error: 'No tienes un centro de votación asignado.' },
-        { status: 400 }
+        { error: 'No hay coordenadas de referencia configuradas para tu JRV.' },
+        { status: 500 }
       );
     }
 
@@ -129,20 +143,25 @@ export async function POST(request: NextRequest) {
       referenceLongitude
     ) / 1000; // Convertir metros a km
 
-    console.log('📍 Validación GPS:', {
+    console.log('📍 Validación GPS basada en JRV:', {
+      jrvNumber: qrInfo.jrv.numeroFormateado,
+      jrvCode: qrData.jrvNumber,
+      centroVotacion: referenceName,
       delegatePosition: { latitude, longitude },
-      referencePosition: { referenceLatitude, referenceLongitude },
-      referenceName,
+      centerPosition: { referenceLatitude, referenceLongitude },
       distanceKm: distanceKm.toFixed(2),
       maxAllowed: MAX_DISTANCE_KM,
+      resultado: distanceKm <= MAX_DISTANCE_KM ? '✅ VÁLIDO' : '❌ RECHAZADO',
     });
 
     if (distanceKm > MAX_DISTANCE_KM) {
       return NextResponse.json(
         {
-          error: `Tu ubicación está muy lejos de tu centro de votación (${distanceKm.toFixed(1)} km). Debes estar a máximo ${MAX_DISTANCE_KM} km.`,
+          error: `Tu ubicación está muy lejos del centro de votación de tu JRV (${distanceKm.toFixed(1)} km de ${referenceName}). Debes estar a máximo ${MAX_DISTANCE_KM} km.`,
           distance: distanceKm,
           maxDistance: MAX_DISTANCE_KM,
+          jrv: qrInfo.jrv.numeroFormateado,
+          centro: referenceName,
         },
         { status: 403 }
       );
@@ -231,16 +250,25 @@ export async function POST(request: NextRequest) {
         partido: qrInfo.partido.nombre,
         partidoSigla: qrInfo.partido.sigla,
         jrv: qrInfo.jrv.numeroFormateado,
+        jrvCode: qrData.jrvNumber,
         cargo: qrInfo.cargo.nombre,
         cargoTipo: qrInfo.cargo.tipo,
         puedeVotar: qrInfo.cargo.puedeVotar,
         restriccionHoraria: qrInfo.cargo.restriccionHoraria,
-        // Centro de votación
-        center: delegate.center ? {
-          id: delegate.center.id,
-          name: delegate.center.name,
-          code: delegate.center.code,
-        } : null,
+        // Centro de votación (del QR/JRV, no del perfil del delegado)
+        center: {
+          id: jrv.center.id,
+          name: jrv.center.name,
+          code: jrv.center.code,
+          latitude: jrv.center.latitude,
+          longitude: jrv.center.longitude,
+        },
+        // Validación GPS
+        gpsValidation: {
+          distanceKm: parseFloat(distanceKm.toFixed(2)),
+          maxAllowed: MAX_DISTANCE_KM,
+          withinRange: true,
+        },
       },
       message: 'Autenticación exitosa',
     });
